@@ -1,0 +1,52 @@
+---
+title: "Lab 4: House Elevation NPV Analysis"
+author: "Your Name"
+jupyter: julia-1.10
+date: 2024-02-08
+week: 5
+categories: [Lab]
+
+format: 
+    html: default
+
+    # YOU DO NOT NEED BOTH PDF AND DOCX.
+    # COMMENT OR DELETE THE ONE YOU DON'T WANT TO USE.
+    pdf:
+        documentclass: article
+        fontsize: 11pt
+        geometry:
+            - margin=1in  
+        number-sections: true
+        code-line-numbers: true
+    #docx: 
+    #    toc: true
+    #    fig-format: png
+    #    number-sections: true
+    #    code-line-numbers: true
+
+# these are optional
+# if you have cache=true, you'll need the jupyter-cache package installed
+execute: 
+  cache: true
+  freeze: true
+
+date-format: "ddd., MMM. D"
+bibliography: references.bib
+---
+
+```{julia}
+#| output: false
+using CSV
+using DataFrames
+using DataFramesMeta
+using Distributions
+using Interpolations
+using Plots
+using StatsPlots
+using Unitful
+
+Plots.default(; margin=6Plots.mm)
+
+include("depthdamage.jl")
+```
+
