@@ -1,8 +1,8 @@
 ---
 title: "Lab 4: House Elevation NPV Analysis"
-author: "Your Name"
+author: "Jiayue Yin"
 jupyter: julia-1.10
-date: 2024-02-08
+date: 2024-02-13
 week: 5
 categories: [Lab]
 
@@ -50,3 +50,107 @@ Plots.default(; margin=6Plots.mm)
 include("depthdamage.jl")
 ```
 
+## pervious settings
+
+```{julia}
+# loading the data and the fuction before
+haz_fl_dept = CSV.read("data/haz_fl_dept.csv", DataFrame) # read in the file
+desc = "one story, Contents, fresh water, short duration"
+row = @rsubset(haz_fl_dept, :Description == desc)[1, :] # select the row I want
+dd = DepthDamageData(row) # extract the depth-damage data
+damage_fn = get_depth_damage_function(dd.depths, dd.damages) # get the depth-damage function
+elevation_cost = get_elevation_cost_function()
+```
+
+```{julia}
+# set the origin value 
+gauge_dist = GeneralizedExtremeValue(5, 1, 0.1) 
+offset = 7.5 
+house_dist = GeneralizedExtremeValue(gauge_dist.μ - offset, gauge_dist.σ, gauge_dist.ξ)
+```
+
+
+```{julia}
+# using the resteraunt data on lab3 
+house_area = 928u"ft^2" 
+house_value = 230000
+elevation = 1
+flood_dist = GeneralizedExtremeValue(gauge_dist.μ - (offset + elevation), gauge_dist.σ, gauge_dist.ξ)
+Δh = elevation * 1u"ft"
+```
+
+## NPV analysis
+
+```{julia}
+function single_year_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh)   
+    samples = rand(flood_dist, 1000) .* 1u"ft"
+    damages = damage_fn.(samples)
+    expected_damages_pct = mean(damages)
+    c_dmg = expected_damages_pct * house_value / 100
+    c_constr = elevation_cost.(Δh, house_area)
+    return -c_constr - c_dmg
+end
+```
+
+```{julia}
+function npv_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh, T, discount_rate)
+    # calculate the costs and benefits for each year, and then discount
+    time = 0
+    npv = 0
+    for time in (1:T)
+    cost = single_year_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh)
+    yearcost = cost * (1-discount_rate)^time
+    npv += yearcost
+    Δh=0u"ft"
+    end
+
+    return npv
+end
+```
+
+## One SOW, several actions
+```{julia}
+discount_rate = 0.05
+T = 10
+# npvcost = npv_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh, T, discount_rate)
+# print(npvcost)
+
+for elevation in range(0.,6.)
+    flood_dist = GeneralizedExtremeValue(gauge_dist.μ - (offset + elevation), gauge_dist.σ, gauge_dist.ξ)
+    Δh = elevation * 1u"ft"
+    npvcost = npv_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh, T, discount_rate)
+    println("While elevation = ",elevation," NPV = ", npvcost)
+end
+
+for Times in range(0,100,11)
+    flood_dist = GeneralizedExtremeValue(gauge_dist.μ - (offset + elevation), gauge_dist.σ, gauge_dist.ξ)
+    Δh = 5u"ft"
+    npvcost = npv_cost_benefit(flood_dist, damage_fn, elevation_cost, house_area, house_value, Δh, Times, discount_rate)
+    println("While Time = ",Times," NPV = ", npvcost)
+end
+```
+
+# Sensitivity Test
+```{julia}
+discount = Normal(0.5,2) /100
+rate_samples = rand(discount, 200)
+elevation = 2
+Δh = elevation * 1u"ft"
+npvs = npv_cost_benefit.(gauge_dist, damage_fn, elevation_cost, house_area, house_value, Δh, T, rate_samples)
+exp_npv = mean(npvs)
+```
+
+## Discussion
+
+1. What do you notice about the NPV for different actions?
+    Raising the height of a house has a significant impact. The NPV value has always remained negative, and the maximum NPV value appears when elevation is 5. As time increases, the value of NPV continues to decrease. There is no maximum NPV value appears while change time.  
+1. What do you notice about the sensitivity test?
+    As the ratio fluctuates between 0.5, the average result is smaller than before.
+1. What are some limitations of this analysis?
+    - What things are missing from this analysis that you think are important?
+    - How might they affect the results?
+    - What are some ways you might address these limitations?
+
+This result is a relatively crude result, and it does not explore specifically which types of costs have increased and which types of benefits have decreased? Is there a specific elevation threshold above which costs increase dramatically?
+There are many factors that are not taken into account, such as the specific type of climate disaster, the error of the loss function, the impact of inflation on the amount of loss, etc.
+I think a single model is not enough to solve this problem. Multiple models should be introduced and given weights to jointly solve this problem.
